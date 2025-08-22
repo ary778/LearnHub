@@ -1,0 +1,35 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learnhub - The Nexus of Knowledge</title>
+    <link rel="stylesheet" href="{% static 'search/css/style.css' %}">
+</head>
+<body class="homepage-body">
+    
+    <header class="main-header">
+        <div class="container">
+            <a href="{% url 'search:home' %}" class="logo">Learnhub<span class="logo-accent">.</span></a>
+        </div>
+    </header>
+
+    <main class="hero">
+        <div class="hero-content">
+            <h1>Discover, Learn, <span class="highlight">Conquer</span>.</h1>
+            <p>Search for <span id="typed-element"></span></p>
+            <form action="{% url 'search:search_results' %}" method="get" class="search-bar">
+                <input type="text" name="q" placeholder="What are you curious about?" autocomplete="off">
+                <button type="submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg>
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+    <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
+    <script src="{% static 'search/js/main.js' %}"></script>
+</body>
+</html>

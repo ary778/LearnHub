@@ -1,93 +1,102 @@
-import time
+import os
 import requests
-from bs4 import BeautifulSoup, Tag
-from urllib.parse import unquote
 from django.conf import settings
-from typing import List, Dict
-from serpapi import GoogleSearch
 
-YOUTUBE_API_KEY = getattr(settings, 'YOUTUBE_API_KEY', '')
-SERP_API_KEY = "d6270772107d49bfe9ee0a7f41af9de96999448b62b109efc053dc49aeaf883a"
+YOUTUBE_API_KEY = getattr(settings, 'YOUTUBE_API_KEY', os.getenv('YOUTUBE_API_KEY', ''))
+GOOGLE_BOOKS_API_KEY = getattr(settings, 'GOOGLE_BOOKS_API_KEY', os.getenv('GOOGLE_BOOKS_API_KEY', ''))
 
-def get_youtube_results(query: str, max_results: int = 5) -> List[Dict]:
-    if not YOUTUBE_API_KEY:
-        print("YouTube API key not configured")
-        return []
-
-    url = "https://www.googleapis.com/youtube/v3/search"
-    params = {
-        "part": "snippet",
-        "q": query,
-        "key": YOUTUBE_API_KEY,
-        "maxResults": max_results,
-        "type": "video",
-        "relevanceLanguage": "en"
-    }
-
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        return parse_youtube_response(response.json(), max_results)
-    except requests.RequestException as e:
-        print(f"YouTube API request failed: {str(e)}")
-        return []
-
-def parse_youtube_response(data: Dict, max_results: int) -> List[Dict]:
+# -------- Google Books --------
+def fetch_google_books(query: str, max_results: int = 5):
+    params = {'q': query, 'maxResults': max_results, 'printType': 'books'}
+    if GOOGLE_BOOKS_API_KEY:
+        params['key'] = GOOGLE_BOOKS_API_KEY
+    r = requests.get('https://www.googleapis.com/books/v1/volumes', params=params, timeout=20)
+    r.raise_for_status()
+    items = r.json().get('items', [])
     results = []
-    for item in data.get("items", [])[:max_results]:
-        try:
-            video_id = item["id"]["videoId"]
-            title = item["snippet"]["title"]
-            results.append({
-                "title": title,
-                "url": f"https://youtube.com/watch?v={video_id}",
-                "thumbnail": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-            })
-        except (KeyError, TypeError) as e:
-            print(f"Error parsing YouTube result: {str(e)}")
+    for it in items:
+        info = it.get('volumeInfo', {})
+        results.append({
+            'title': info.get('title'),
+            'authors': info.get('authors', []),
+            'publisher': info.get('publisher'),
+            'publishedDate': info.get('publishedDate'),
+            'thumbnail': (info.get('imageLinks') or {}).get('thumbnail'),
+            'url': info.get('infoLink') or info.get('previewLink'),
+        })
     return results
 
-def get_codeforces_links(topic: str) -> List[Dict]:
-    tag = topic.lower().replace(" ", "-")
-    return [{
-        "title": f"Codeforces problems tagged '{topic}'",
-        "url": f"https://codeforces.com/problemset?tags={tag}"
-    }]
-
-def get_search_links(topic: str, source: str) -> List[Dict]:
-    if not topic.strip():
+# -------- YouTube --------
+def fetch_youtube_videos(query: str, max_results: int = 6):
+    if not YOUTUBE_API_KEY:
         return []
-
-    query = topic.replace(" ", "+")
-    links = []
-
-    if source in ['gfg', 'all']:
-        links += get_serpapi_links(query, "geeksforgeeks.org")
-    if source in ['medium', 'all']:
-        links += get_serpapi_links(query, "medium.com")
-
-    return links[:3]
-
-def get_serpapi_links(query: str, site: str) -> List[Dict]:
-    if not query or not site:
-        return []
-
-    try:
-        search = GoogleSearch({
-            "q": f"site:{site} {query}",
-            "api_key": SERP_API_KEY
+    params = {
+        'part': 'snippet',
+        'q': query,
+        'type': 'video',
+        'maxResults': max_results,
+        'key': YOUTUBE_API_KEY,
+        'safeSearch': 'none',
+    }
+    r = requests.get('https://www.googleapis.com/youtube/v3/search', params=params, timeout=20)
+    r.raise_for_status()
+    data = r.json().get('items', [])
+    out = []
+    for it in data:
+        video_id = it['id']['videoId']
+        sn = it['snippet']
+        out.append({
+            'title': sn.get('title'),
+            'channel': sn.get('channelTitle'),
+            'publishedAt': sn.get('publishedAt'),
+            'thumbnail': (sn.get('thumbnails') or {}).get('high', {}).get('url'),
+            'url': f'https://www.youtube.com/watch?v={video_id}',
         })
-        results = search.get_dict().get("organic_results", [])
-        final_links = []
+    return out
 
-        for r in results:
-            if site in r.get("link", ""):
-                final_links.append({
-                    "title": r.get("title", "Untitled"),
-                    "url": r.get("link")
-                })
-
-        return final_links[:3]
-    except Exception as e:
-        print(f"SerpAPI error for {site}: {str(e)}")
+# -------- Codeforces Problems --------
+def fetch_codeforces_problems(query: str, max_results: int = 20):
+    r = requests.get('https://codeforces.com/api/problemset.problems', timeout=30)
+    r.raise_for_status()
+    payload = r.json()
+    if payload.get('status') != 'OK':
         return []
+    problems = payload.get('result', {}).get('problems', [])
+    q = query.lower()
+    filtered = []
+    for p in problems:
+        name = p.get('name', '')
+        tags = p.get('tags', [])
+        if q in name.lower() or any(q in t.lower() for t in tags):
+            cid = p.get('contestId')
+            idx = p.get('index')
+            url = f'https://codeforces.com/problemset/problem/{cid}/{idx}' if cid and idx else 'https://codeforces.com/problemset'
+            filtered.append({'title': name, 'tags': tags, 'rating': p.get('rating'), 'url': url})
+            if len(filtered) >= max_results:
+                break
+    return filtered
+
+# -------- Codeforces Blogs (filter recent entries) --------
+def fetch_codeforces_blogs(query: str, max_actions: int = 200):
+    r = requests.get('https://codeforces.com/api/recentActions', params={'maxCount': max_actions}, timeout=20)
+    r.raise_for_status()
+    payload = r.json()
+    if payload.get('status') != 'OK':
+        return []
+    actions = payload.get('result', [])
+    q = query.lower()
+    results = []
+    for act in actions:
+        blog = (act.get('blogEntry') or {})
+        title = blog.get('title')
+        if not title:
+            continue
+        if q in title.lower():
+            bid = blog.get('id')
+            results.append({
+                'title': title,
+                'authorHandle': (blog.get('author') or {}).get('handle'),
+                'creationTimeSeconds': blog.get('creationTimeSeconds'),
+                'url': f'https://codeforces.com/blog/entry/{bid}' if bid else 'https://codeforces.com/blog',
+            })
+    return results[:10]

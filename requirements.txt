@@ -1,0 +1,6 @@
+django
+djangorestframework
+python-dotenv
+psycopg2-binary
+requests
+google-api-python-client
