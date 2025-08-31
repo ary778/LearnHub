@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -9,10 +10,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')  # fallback only for dev
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = []
-
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    
 INSTALLED_APPS = [
     # default apps...
     'django.contrib.admin',
@@ -56,14 +60,12 @@ TEMPLATES = [
 
 # PostgreSQL from env
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'learnhub',      # database name you just created
-        'USER': 'postgres',      # your pgAdmin username
-        'PASSWORD': '1234',  # your pgAdmin password
-        'HOST': 'localhost',     # or 127.0.0.1
-        'PORT': '5432',          # default PostgreSQL port
-    }
+    'default': dj_database_url.config(
+        # Get the database URL from the environment, with a default for local development
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True # Important for Render connections
+    )
 }
 
 
@@ -88,7 +90,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 STATIC_URL = '/static/'
 
 # Where collected static files will be stored (for production)
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Additional directories where Django will look for static files
 STATICFILES_DIRS = [
