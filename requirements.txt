@@ -69,4 +69,5 @@ uritemplate==4.2.0
 urllib3==2.4.0
 webdriver-manager==4.0.2
 websocket-client==1.8.0
+whitenoise==6.9.0
 wsproto==1.2.0

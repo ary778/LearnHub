@@ -34,6 +34,7 @@ INSTALLED_APPS = [
 # ... middleware, templates ...
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -91,6 +92,7 @@ STATIC_URL = '/static/'
 
 # Where collected static files will be stored (for production)
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Additional directories where Django will look for static files
 STATICFILES_DIRS = [
