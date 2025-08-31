@@ -12,6 +12,7 @@ dill==0.4.0
 dj-database-url==3.0.1
 Django==5.2.3
 django-environ==0.12.0
+djangorestframework==3.16.1
 git-filter-repo==2.47.0
 google-api-core==2.25.1
 google-api-python-client==2.179.0
